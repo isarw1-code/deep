@@ -194,15 +194,20 @@
       }
     });
 
-    // Escape: cierra la cámara y libera el dispositivo
-    document.addEventListener("keydown", (e) => {
-      if (e.key === "Escape" && cam.classList.contains("show")) {
-        cam.classList.remove("show");
-        gate.classList.remove("hidden");
-        if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
-        video.srcObject = null;
-      }
-    });
+    // Con la cámara activa, CUALQUIER tecla vuelve a la pantalla de contraseña
+    function returnToGate() {
+      if (!cam.classList.contains("show")) return;
+      cam.classList.remove("show");
+      gate.classList.remove("hidden");
+      if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+      video.srcObject = null;
+      // reinicia la pantalla para volver a introducir la contraseña
+      clearError();
+      pw.value = "";
+      need.classList.remove("show");
+      pw.focus();
+    }
+    document.addEventListener("keydown", returnToGate);
 
     window.addEventListener("load", () => pw.focus());
   </script>
