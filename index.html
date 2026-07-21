@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <title>Deepmarkers</title>
+  <link rel="icon" type="image/png" href="assets/logo.png" />
+  <style>
+    @font-face {
+      font-family: 'JetBrains Mono';
+      font-style: normal;
+      font-weight: 400;
+      font-display: swap;
+      src: url('assets/fonts/JetBrainsMono-Regular-latin.woff2') format('woff2');
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { height: 100%; }
+
+    body {
+      background: #000;
+      color: #7a7a7a;
+      font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+      -webkit-font-smoothing: antialiased;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      overflow: hidden;
+      user-select: none;
+    }
+
+    /* ---- Pantalla de contraseña ---- */
+    .gate {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      transition: opacity .6s ease;
+    }
+    .gate.hidden { opacity: 0; pointer-events: none; }
+
+    .logo {
+      width: 148px;
+      height: auto;
+      margin-bottom: 58px;
+      -webkit-user-drag: none;
+    }
+
+    .field { width: 240px; }
+
+    .pw {
+      width: 100%;
+      background: transparent;
+      border: none;
+      border-bottom: 1px solid #4a4a4a;
+      color: #d0d0d0;
+      text-align: center;
+      font-family: inherit;
+      font-size: 16px;
+      font-weight: 400;
+      letter-spacing: .04em;
+      padding: 8px 0 12px;
+      outline: none;
+      caret-color: #d0d0d0;
+    }
+    .pw::placeholder { color: #6f6f6f; letter-spacing: .04em; }
+    .pw:focus { border-bottom-color: #6a6a6a; }
+
+    .error {
+      min-height: 15px;
+      margin-top: 20px;
+      font-size: 13px;
+      font-weight: 400;
+      letter-spacing: .04em;
+      color: #cf5c5c;
+      opacity: 0;
+      transition: opacity .25s ease;
+    }
+    .error.show { opacity: 1; }
+
+    .granted { color: #7fbf8f; }
+
+    .need {
+      margin-top: 78px;
+      font-family: inherit;
+      font-size: 14px;
+      font-weight: 400;
+      letter-spacing: .04em;
+      color: #6b6b6b;
+      background: none;
+      border: none;
+      cursor: pointer;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .5s ease, color .2s ease;
+    }
+    .need.show { opacity: 1; pointer-events: auto; }
+    .need:hover { color: #9a9a9a; }
+
+    /* ---- Cámara (reflejo) ---- */
+    .cam {
+      position: fixed;
+      inset: 0;
+      background: #000;
+      z-index: 20;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 1.1s ease;
+    }
+    .cam.show { opacity: 1; pointer-events: auto; }
+    .cam video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transform: scaleX(-1); /* efecto espejo: se ve reflejado */
+    }
+  </style>
+</head>
+<body>
+  <main class="gate" id="gate">
+    <img class="logo" src="assets/logo.png" alt="Deepmarkers" draggable="false" />
+
+    <div class="field">
+      <input
+        id="pw"
+        class="pw"
+        type="password"
+        placeholder="Password"
+        autocomplete="off"
+        autocapitalize="off"
+        autocorrect="off"
+        spellcheck="false"
+        aria-label="Password"
+      />
+    </div>
+
+    <div class="error" id="error"></div>
+
+    <button class="need" id="need" type="button">Need the password?</button>
+  </main>
+
+  <div class="cam" id="cam">
+    <video id="video" autoplay playsinline muted></video>
+  </div>
+
+  <script>
+    const PASSWORD = "helio";
+
+    const pw    = document.getElementById("pw");
+    const error = document.getElementById("error");
+    const need  = document.getElementById("need");
+    const gate  = document.getElementById("gate");
+    const cam   = document.getElementById("cam");
+    const video = document.getElementById("video");
+
+    let stream = null;
+
+    function showError(msg, granted) {
+      error.textContent = msg;
+      error.classList.toggle("granted", !!granted);
+      error.classList.add("show");
+    }
+    function clearError() {
+      error.classList.remove("show");
+      error.classList.remove("granted");
+    }
+
+    // Enviar con Enter
+    pw.addEventListener("keydown", (e) => {
+      if (e.key !== "Enter") { clearError(); return; }
+      const value = pw.value.trim().toLowerCase();
+      if (value === PASSWORD) {
+        showError("Access granted", true);
+      } else {
+        showError("Incorrect password", false);
+        need.classList.add("show"); // se revela solo tras fallar
+        pw.value = "";
+      }
+    });
+    pw.addEventListener("input", clearError);
+
+    // "Need the password?" -> activa la cámara y te ves reflejado
+    need.addEventListener("click", async () => {
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: "user" },
+          audio: false
+        });
+        video.srcObject = stream;
+        gate.classList.add("hidden");
+        cam.classList.add("show");
+      } catch (err) {
+        showError("Camera access denied", false);
+      }
+    });
+
+    // Escape: cierra la cámara y libera el dispositivo
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && cam.classList.contains("show")) {
+        cam.classList.remove("show");
+        gate.classList.remove("hidden");
+        if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+        video.srcObject = null;
+      }
+    });
+
+    window.addEventListener("load", () => pw.focus());
+  </script>
+</body>
+</html>
